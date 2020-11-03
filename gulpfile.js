@@ -1,180 +1,270 @@
-var gulp  = require('gulp')
-  , path  = require('path')
-  , merge = require('event-stream').merge
-  , map   = require('map-stream')
-  , spawn = require('child_process').spawn
-  , $     = require('gulp-load-plugins')()
+const gulp = require('gulp');
+const gutil = require('gulp-util');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const {merge} = require('event-stream');
+const map = require('map-stream');
+const {spawn} = require('child_process');
+const $ = require('gulp-load-plugins')();
+const uglify = require('gulp-uglify-es').default;
 
-/**
- * Public tasks
- */
-gulp.task('clean', function () {
-  return pipe('./tmp', [$.clean()])
-})
+// Shared
+gulp.task('clean', () => {
+  return pipe(
+    './tmp',
+    $.clean()
+  );
+});
 
-gulp.task('build', function (cb) {
-  $.runSequence('clean', 'css', 'chrome', 'opera', 'safari', 'firefox', cb)
-})
+gulp.task('build', (cb) => {
+  $.runSequence('clean', 'css', 'wex', 'chrome', 'opera', 'firefox', cb);
+});
 
-gulp.task('default', ['build'], function () {
-  gulp.watch(['./src/**/*'], ['default'])
-})
+gulp.task('default', ['build'], () => {
+  gulp.watch(['./libs/**/*', './src/**/*', './package.json'], ['default']);
+});
 
-gulp.task('dist', ['build'], function (cb) {
-  $.runSequence('firefox:xpi', 'chrome:zip', 'chrome:crx', 'opera:nex', cb)
-})
+gulp.task('dist', ['build'], (cb) => {
+  $.runSequence('chrome:zip', 'opera:nex', 'firefox:zip', cb);
+});
 
-gulp.task('test', function (cb) {
-  var ps = spawn(
-    './node_modules/.bin/mocha',
-    ['--harmony', '--reporter', 'spec', '--bail', '--recursive', '--timeout', '-1']
-  )
-  ps.stdout.pipe(process.stdout);
-  ps.stderr.pipe(process.stderr);
-  ps.on('close', cb)
-})
+gulp.task('css', () => {
+  return pipe(
+    './src/styles/octotree.less',
+    $.plumber(),
+    $.less({relativeUrls: true}),
+    $.autoprefixer({cascade: true}),
+    './tmp'
+  );
+});
 
-/**
- * Private tasks
- */
-gulp.task('css', function () {
-  return pipe('./src/octotree.less', [$.less(), $.autoprefixer({cascade: true})], './tmp')
-})
+gulp.task('lib:ondemand', (cb) => {
+  const dir = './libs/ondemand';
+  const code = fs
+    .readdirSync(dir)
+    .map((file) => {
+      return `window['${file}'] = function () {
+      ${fs.readFileSync(path.join(dir, file))}
+    };\n`;
+    })
+    .join('');
 
-// Chrome
-gulp.task('chrome:template', function () {
-  return buildTemplate({CHROME: true})
-})
+  fs.writeFileSync('./tmp/ondemand.js', code, {flag: 'w'});
+  cb();
+});
 
-gulp.task('chrome:js', ['chrome:template'], function () {
-  return buildJs(['./src/chrome/storage.js'], {CHROME: true})
-})
+// WebExtensions
+gulp.task('wex:template', () => buildTemplate());
+gulp.task('wex:js:ext', ['wex:template', 'lib:ondemand'], () => buildJs());
 
-gulp.task('chrome', ['chrome:js'], function () {
-  return merge(
-    pipe('./icons/**/*', './tmp/chrome/icons'),
-    pipe(['./libs/**/*', './tmp/octotree.*', './src/chrome/**/*', '!./src/chrome/storage.js'], './tmp/chrome/')
-  )
-})
+gulp.task('wex:js', ['wex:js:ext'], () => {
+  const src = [
+    './libs/file-icons.js',
+    './libs/jquery.js',
+    './libs/jquery-ui.js',
+    './libs/jstree.js',
+    './libs/keymaster.js',
+    './tmp/ondemand.js',
+    './tmp/octotree.js'
+  ];
+  return pipe(
+    src,
+    $.wrap('(function(){\n<%= contents %>\n})();'),
+    $.concat('content.js'),
+    gutil.env.production && uglify(),
+    './tmp'
+  );
+});
 
-gulp.task('chrome:zip', function () {
-  return pipe('./tmp/chrome/**/*', [$.zip('chrome.zip')], './dist')
-})
-
-gulp.task('chrome:_crx', function (cb) {
-  $.run('"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"' +
-    ' --pack-extension=' + path.join(__dirname, './tmp/chrome') +
-    ' --pack-extension-key=' + path.join(process.env.HOME, '.ssh/chrome.pem')
-  ).exec(cb)
-})
-
-gulp.task('chrome:crx', ['chrome:_crx'], function () {
-  return pipe('./tmp/chrome.crx', './dist')
-})
-
-// Opera
-gulp.task('opera', ['chrome'], function () {
-  return pipe('./tmp/chrome/**/*', './tmp/opera')
-})
-
-gulp.task('opera:nex', function () {
-  return pipe('./dist/chrome.crx', [$.rename('opera.nex')], './dist')
-})
-
-// Safari
-gulp.task('safari:template', function () {
-  return buildTemplate({SAFARI: true})
-})
-
-gulp.task('safari:js', ['safari:template'], function () {
-  return buildJs(['./src/safari/storage.js'], {SAFARI: true})
-})
-
-gulp.task('safari', ['safari:js'], function () {
-  return merge(
-    pipe('./icons/**/*', './tmp/safari/octotree.safariextension/icons'),
-    pipe(['./libs/**/*', './tmp/octotree.js', './tmp/octotree.css',
-      './src/safari/**/*', '!./src/safari/storage.js'], './tmp/safari/octotree.safariextension/')
-  )
-})
+gulp.task('wex', ['wex:js']);
 
 // Firefox
-gulp.task('firefox:template', function () {
-  return buildTemplate({FIREFOX: true})
-})
+gulp.task('firefox:css:libs', () => buildCssLibs('.', 'moz-extension://__MSG_@@extension_id__/'));
+gulp.task('firefox:css', ['firefox:css:libs'], () => buildCss());
+gulp.task('firefox', ['firefox:css'], () => prepareWexFolder('firefox'));
 
-gulp.task('firefox:js', ['firefox:template'], function () {
-  return buildJs(['./src/firefox/storage.js'], {FIREFOX: true})
-})
+gulp.task('firefox:zip', () => {
+  return pipe(
+    './tmp/firefox/**/*',
+    $.zip('firefox.zip'),
+    './dist'
+  );
+});
 
-gulp.task('firefox', ['firefox:js'], function () {
-  return merge(
-    pipe('./icons/**/*', './tmp/firefox/data/icons'),
-    pipe(['./libs/**/*', './tmp/octotree.js', './tmp/octotree.css'], './tmp/firefox/data'),
-    pipe(['./src/firefox/firefox.js'], './tmp/firefox/lib'),
-    pipe('./src/firefox/package.json', './tmp/firefox')
-  )
-})
+// Chrome
+gulp.task('chrome:css:libs', () => buildCssLibs('.', 'chrome-extension://__MSG_@@extension_id__/'));
+gulp.task('chrome:css', ['chrome:css:libs'], () => buildCss());
+gulp.task('chrome', ['chrome:css'], () => prepareWexFolder('chrome'));
 
-gulp.task('firefox:xpi', function (cb) {
-  $.run('cd ./tmp/firefox && cfx xpi --output-file=../../dist/firefox.xpi').exec(cb)
-})
+gulp.task('chrome:zip', () => {
+  return pipe(
+    './tmp/chrome/**/*',
+    $.zip('chrome.zip'),
+    './dist'
+  );
+});
 
-/**
- * Helpers
- */
-function pipe(src, transforms, dest) {
-  if (typeof transforms === 'string') {
-    dest = transforms
-    transforms = null
-  }
-  var stream = gulp.src(src)
-  transforms && transforms.forEach(function (transform) {
-    stream = stream.pipe(transform)
-  })
-  if (dest) stream = stream.pipe(gulp.dest(dest))
-  return stream
+// Opera
+gulp.task('opera', ['chrome'], () => {
+  return pipe(
+    './tmp/chrome/**/*',
+    './tmp/opera'
+  );
+});
+
+gulp.task('opera:nex', () => {
+  return pipe(
+    './tmp/opera/**/*',
+    $.zip('opera.nex'),
+    './dist'
+  );
+});
+
+// Helpers
+function pipe(src, ...transforms) {
+  const work = transforms
+    .filter((t) => !!t)
+    .reduce((stream, transform) => {
+      const isDest = typeof transform === 'string';
+      return stream.pipe(isDest ? gulp.dest(transform) : transform).on('error', (err) => {
+        gutil.log(gutil.colors.red('[Error]'), err.toString());
+      });
+    }, gulp.src(src));
+
+  return work;
 }
 
 function html2js(template) {
-  return map(escape)
+  return map(escape);
 
   function escape(file, cb) {
-    var path = $.util.replaceExtension(file.path, '.js')
-      , content = file.contents.toString()
-      , escaped = content.replace(/\\/g, "\\\\")
-          .replace(/'/g, "\\'")
-          .replace(/\r?\n/g, "\\n' +\n    '")
-      , body = template.replace('$$', escaped)
-    file.path = path
-    file.contents = new Buffer(body)
-    cb(null, file)
+    const path = $.util.replaceExtension(file.path, '.js');
+    const content = file.contents.toString();
+    /* eslint-disable quotes */
+    const escaped = content
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'")
+      .replace(/\r?\n/g, "\\n' +\n    '");
+    /* eslint-enable */
+    const body = template.replace('$$', escaped);
+
+    file.path = path;
+    file.contents = new Buffer(body);
+    cb(null, file);
   }
 }
 
-function buildJs(additions, ctx) {
-  var src = additions.concat([
-    './tmp/template.js',
-    './src/constants.js',
-    './src/adapter.github.js',
-    './src/view.help.js',
-    './src/view.error.js',
-    './src/view.tree.js',
-    './src/view.options.js',
-    './src/util.location.js',
-    './src/util.module.js',
-    './src/util.async.js',
-    './src/octotree.js',
-  ])
-  return pipe(src, [
+function buildJs(prefix = '.', ctx = {}) {
+  const src = [
+    `${prefix}/tmp/template.js`,
+    `${prefix}/src/util.module.js`,
+    `${prefix}/src/util.async.js`,
+    `${prefix}/src/util.misc.js`,
+    `${prefix}/src/util.deXss.js`,
+    `${prefix}/src/util.plugins.js`,
+    `${prefix}/src/core.constants.js`,
+    `${prefix}/src/core.storage.js`,
+    `${prefix}/src/core.plugins.js`,
+    `${prefix}/src/core.api.js`,
+    `${prefix}/src/adapters/adapter.js`,
+    `${prefix}/src/adapters/pjax.js`,
+    `${prefix}/src/adapters/github.js`,
+    `${prefix}/src/view.help.js`,
+    `${prefix}/src/view.error.js`,
+    `${prefix}/src/view.tree.js`,
+    `${prefix}/src/view.options.js`,
+    `${prefix}/src/main.js`
+  ];
+
+  return pipe(
+    src,
+    $.preprocess({context: ctx}),
     $.concat('octotree.js'),
-    $.preprocess({context: ctx})
-  ], './tmp')
+    './tmp'
+  );
 }
 
-function buildTemplate(ctx) {
-  return pipe('./src/template.html', [
-    $.preprocess({context: ctx}),
-    html2js('const TEMPLATE = \'$$\'')
-  ], './tmp')
+function buildCssLibs(prefix = '.', targetPrefix = '') {
+  return merge(
+    pipe(
+      `${prefix}/libs/file-icons.css`,
+      $.replace('../fonts', `${targetPrefix}fonts`),
+      './tmp'
+    ),
+    pipe(
+      `${prefix}/libs/jstree.css`,
+      $.replace('url("32px.png")', `url("${targetPrefix}images/32px.png")`),
+      $.replace('url("40px.png")', `url("${targetPrefix}images/40px.png")`),
+      $.replace('url("throbber.gif")', `url("${targetPrefix}images/throbber.gif")`),
+      './tmp'
+    )
+  );
 }
+
+function buildCss(prefix = '.') {
+  return pipe(
+    [`${prefix}/tmp/file-icons.css`, `${prefix}/tmp/jstree.css`, `${prefix}/tmp/octotree.css`],
+    $.concat('content.css'),
+    gutil.env.production && $.cssmin(),
+    './tmp'
+  );
+}
+
+function buildTemplate(prefix = '.', ctx = {}) {
+  const LOTS_OF_SPACES = new Array(500).join(' ');
+
+  return pipe(
+    `${prefix}/src/template.html`,
+    $.preprocess({context: ctx}),
+    $.replace('__SPACES__', LOTS_OF_SPACES),
+    html2js('const TEMPLATE = \'$$\''),
+    './tmp'
+  );
+}
+
+function prepareWexFolder(browser) {
+  return merge(
+    pipe(
+      './icons/**/*',
+      `./tmp/${browser}/icons`
+    ),
+    pipe(
+      './libs/fonts/**/*',
+      `./tmp/${browser}/fonts`
+    ),
+    pipe(
+      './libs/images/**/*',
+      `./tmp/${browser}/images`
+    ),
+    pipe(
+      './tmp/content.*',
+      `./tmp/${browser}`
+    ),
+    pipe(
+      './src/config/wex/manifest.json',
+      $.preprocess({context: {browser}}),
+      $.replace('$VERSION', getVersion()),
+      `./tmp/${browser}`
+    ),
+    pipe(
+      './src/config/wex/background.js',
+      $.preprocess({context: {browser}}),
+      gutil.env.production && uglify(),
+      `./tmp/${browser}`
+    )
+  );
+}
+
+function getVersion() {
+  delete require.cache[require.resolve('./package.json')];
+  return require('./package.json').version;
+}
+
+module.exports = {
+  pipe,
+  buildTemplate,
+  buildJs,
+  buildCssLibs,
+  buildCss
+};
