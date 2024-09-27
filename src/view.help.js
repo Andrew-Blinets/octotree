@@ -1,27 +1,32 @@
-function HelpPopup($dom, store) {
-  this.$view = $dom.find('.octotree_popup')
-  this.store = store
-}
+class HelpPopup {
+  constructor($dom) {
+    this.$view = $dom.find('.popup');
+  }
 
-HelpPopup.prototype.show = function() {
-  var $view = this.$view
-    , store = this.store
-    , popupShown = store.get(STORE.POPUP)
+  async init() {
+    const $view = this.$view;
+    const store = extStore;
+    const popupShown = await extStore.get(STORE.POPUP);
+    const sidebarVisible = $('html').hasClass(SHOW_CLASS);
 
-  if (popupShown) return
+    if (popupShown || sidebarVisible) {
+      return hideAndDestroy();
+    }
 
-  $view.css('display', 'block').appendTo($('body'))
+    $(document).one(EVENT.TOGGLE, hideAndDestroy);
 
-  $(document).one(EVENT.TOGGLE, hide)
-  setTimeout(function() {
-    store.set(STORE.POPUP, true)
-    $view.addClass('show').click(hide)
-    setTimeout(hide, 6000)
-  }, 500)
+    setTimeout(() => {
+      setTimeout(hideAndDestroy, 10000);
+      $view.addClass('show').click(hideAndDestroy);
+    }, 500);
 
-  function hide() {
-    if ($view.hasClass('show')) {
-      $view.removeClass('show').one('transitionend', function() { $view.remove() })
+    async function hideAndDestroy() {
+      await store.set(STORE.POPUP, true);
+      if ($view.hasClass('show')) {
+        $view.removeClass('show').one('transitionend', () => $view.remove());
+      } else {
+        $view.remove();
+      }
     }
   }
 }

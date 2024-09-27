@@ -1,93 +1,106 @@
 <div>
-  <nav class="octotree_sidebar">
-    <a class="octotree_toggle button"><div class="loader"></div><span></span></a>
-    <a class="octotree_opts" href="javascript:void(0)"><span></span></a>
-    <div class="octotree_views">
-      <div class="octotree_view octotree_treeview current">
-        <div class="octotree_view_header"></div>
-        <div class="octotree_view_body"></div>
+  <nav class="octotree-sidebar">
+    <div class="octotree-toggle">
+      <i class="octotree-toggle-icon" role="button"></i> <span>Octotree</span>
+
+      <div class="popup">
+        <div class="arrow"></div>
+        <div class="content">
+          Hi there, this is Octotree. Move mouse over this button to display the code tree. You can also press the
+          shortkey <kbd>cmd shift s</kbd> (or <kbd>ctrl shift s</kbd>).
+        </div>
+      </div>
+    </div>
+
+    <div class="octotree-main-icons">
+      <a class="octotree-pin" data-store="PINNED">
+        <span class="tooltipped tooltipped-s" aria-label="Pin this sidebar"> <i class="octotree-icon-pin"></i> </span>
+      </a>
+
+      <a class="octotree-settings">
+        <span class="tooltipped tooltipped-s" aria-label="Settings"> <i class="octotree-icon-settings"></i> </span>
+      </a>
+    </div>
+
+    <div class="octotree-views">
+      <div class="octotree-view octotree-tree-view current">
+        <div class="octotree-view-header"></div>
+        <div class="octotree-view-body"></div>
+        <a class="octotree-spin"> <span class="octotree-spin--loader"></span> </a>
       </div>
 
-      <div class="octotree_view octotree_errorview">
-        <div class="octotree_view_header"></div>
-        <form class="octotree_view_body">
-          <div class="message"></div>
-          <div>
-            <input name="token" type="text" placeholder="Paste access token here" autocomplete="off">
-          </div>
-          <div>
-            <button type="submit" class="button">Save</button>
-            <a href="https://github.com/buunguyen/octotree#github-access-token" target="_blank" tabIndex="-1">Why is this required?</a>
-          </div>
-          <div class="error"></div>
-        </form>
+      <div class="octotree-view octotree-error-view">
+        <div class="octotree-view-header octotree-header-text-top"></div>
+        <form class="octotree-view-body"><div class="message"></div></form>
       </div>
 
-      <div class="octotree_view octotree_optsview">
-        <div class="octotree_view_header">Settings</div>
-        <form class="octotree_view_body">
+      <div class="octotree-view octotree-settings-view">
+        <div class="octotree-view-header octotree-header-text-top">Settings</div>
+        <form class="octotree-view-body">
           <div>
-            <div>
-              <label>Site access token</label>
-              <a href="https://github.com/buunguyen/octotree#github-access-token" target="_blank" tabIndex="-1">what's this?</a>
+            <label>GitHub access token</label>
+            <div class="octotree-token-actions">
+              <a class="octotree-create-token" target="_blank" tabindex="-1"
+                ><!--
+                --><span class="tooltipped tooltipped-n" aria-label="Generate new token"
+                  ><i class="octotree-icon-key"></i></span
+                ><!--
+              --></a>
+              <a
+                class="octotree-help"
+                href="https://github.com/ovity/octotree#access-token"
+                target="_blank"
+                tabindex="-1"
+              >
+                <span class="tooltipped tooltipped-n" aria-label="Learn more">
+                  <i class="octotree-icon-help"></i>
+                </span>
+              </a>
             </div>
-            <input type="text" data-store="TOKEN" data-perhost="true">
+            <input type="text" class="form-control input-block" data-store="TOKEN" />
+            <div class="octotree-disclaimer text-gray">Token is stored in local storage</div>
           </div>
-          <!-- @ifdef CHROME -->
-          <div>
-            <div>
-              <label>GitHub Enterprise URLs</label>
-            </div>
-            <textarea data-store="GHEURLS" placeholder="https://github.mysite1.com/                                        https://github.mysite2.com/">
-            </textarea>
-          </div>
-          <!-- @endif -->
-          <hr />
-          <div>
-            <label><input type="checkbox" data-store="REMEMBER"> Show sidebar if previously shown</label>
-          </div>
-          <div>
-            <label><input type="checkbox" data-store="NONCODE"> Show in non-code pages</label>
-          </div>
-          <div>
-            <label><input type="checkbox" data-store="LAZYLOAD"> Only load tree when sidebar is open</label>
-          </div>
-          <div>
-            <label><input type="checkbox" data-store="COLLAPSE"> Collapse folders with single sub-folder</label>
-          </div>
+
           <div>
             <div>
               <label>Hotkeys</label>
-              <a href="https://github.com/madrobby/keymaster#defining-shortcuts" target="_blank" tabIndex="-1">supported keys</a>
+              <div class="octotree-token-actions">
+                <a class="octotree-help" href="https://github.com/ovity/octotree#hotkeys" target="_blank" tabindex="-1">
+                  <span class="tooltipped tooltipped-n" aria-label="Learn more">
+                    <i class="octotree-icon-help"></i>
+                  </span>
+                </a>
+              </div>
             </div>
-            <input type="text" data-store="HOTKEYS">
+            <input
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              autocapitalize="off"
+              class="form-control"
+              data-store="HOTKEYS"
+            />
+          </div>
+
+          <div>
+            <label><input type="checkbox" data-store="HOVEROPEN" /> <span>Show sidebar on hover</span></label>
           </div>
           <div>
-            <div>
-              <label>Tab size</label>
-              <a href="https://github.com/tiimgreen/github-cheat-sheet#adjust-tab-space" target="_blank" tabIndex="-1">what's this?</a>
-            </div>
-            <input type="text" data-store="TABSIZE">
+            <label><input type="checkbox" data-store="ICONS" /> <span>Show file-type icons</span></label>
           </div>
           <div>
-            <button type="submit" class="button">Save</button>
+            <label><input type="checkbox" data-store="PR" /> <span>Show pull request changes</span></label>
           </div>
+          <div>
+            <label><input type="checkbox" data-store="LAZYLOAD" /> <span>Lazy-load code tree</span></label>
+            <span class="octotree-disclaimer is-margin-left text-gray">Speed up large repositories</span>
+          </div>
+
+          <div><button class="btn btn-primary">Apply settings</button></div>
         </form>
       </div>
     </div>
-  </nav>
 
-  <div class="octotree_popup">
-    <div class="arrow"></div>
-    <div class="content">
-      Octotree is enabled on GitHub pages. Click this button or press
-      <!-- @ifdef SAFARI -->
-      <kbd>cmd b</kbd> (or <kbd>ctrl b</kbd>)
-      <!-- @endif -->
-      <!-- @ifndef SAFARI -->
-      <kbd>cmd shift s</kbd> (or <kbd>ctrl shift s</kbd>)
-      <!-- @endif -->
-      to show it.
-    </div>
-  </div>
+    <div class="octotree-footer"></div>
+  </nav>
 </div>
